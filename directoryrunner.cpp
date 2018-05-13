@@ -98,15 +98,18 @@ class DirectoryRunnerImpl :
         public DirectoryRunner,
         public virtual DirectoryRunnerWorkerInterface
 {
+signals:
+
 public:
-    DirectoryRunnerImpl(Logger& logger) :
-        m_logger(logger)
+    DirectoryRunnerImpl(DirectoryRunnerListener& listener) :
+        listener(listener)
     {
     }
-    void run(const fs::path& path) override
+    void start(const fs::path& path) override
     {
         m_foundSourceFiles.clear();
-        qDebug() << "DR.run(" << path.string() << "): Number of CPUs:" << thread::hardware_concurrency();
+        const int numCPUs = thread::hardware_concurrency();
+        qDebug() << "DR.run(" << path.string() << "): Number of CPUs:" << numCPUs;
         if (!fs::exists(path))
         {
             qDebug() << " Path \"" << path.string() << "\" not found";
@@ -127,28 +130,77 @@ public:
         assert(m_pathsToRun.empty());
         m_pathsToRun.clear();
         addDirectory(path);
-        DirectoryRunnerWorker worker(*this);
-        worker.start();
+        assert(threads.empty());
+        threads.clear();
+        assert(workers.empty());
+        workers.clear();
 
-        qDebug() << "  Number of subdirectories:" << m_foundSourceFiles.size();
+        const int numThreads = numCPUs;
+        threads.reserve(numThreads);
+        workers.reserve(numThreads);
+        qDebug() << "  Starting threads";
+        for (int i=0; i<numThreads; ++i)
+        {
+            workers.emplace_back(*this);
+            DirectoryRunnerWorker& worker = workers.back();
+            threads.emplace_back(thread([&worker](){worker.start();}));
+        }
+
+/*        qDebug() << "  Waiting for threads";
+        for (int i=0; i<numThreads; ++i)
+            threads[i].join();
+
+        threads.clear();
+        workers.clear();
+
+        qDebug() << "  Number of subdirectories:" << m_foundSourceFiles.size();*/
+    }
+    void stopInternal()
+    {
+        stopping = true;
+        lock_guard lock(m_pathsToRunMutex);
+        {
+            m_pathsToRun.clear();
+            m_numPathsToProcess = 0;
+            for (unsigned int i=0; i<threads.size(); ++i)
+                threads[i].join();
+            threads.clear();
+            workers.clear();
+            listener.updateList();
+        }
+        stopping = false;
     }
     void stop() override
-    {}
-
-    const vector<string>& getSourceFiles() const override
     {
+        qDebug() << "  DR: stop called - stopping threads";
+        stopInternal();
+    }
+
+    const vector<string>& getSourceFiles() override
+    {
+        lock_guard lock(m_foundSourceFilesMutex);
         return m_foundSourceFiles;
     }
 
 public:
     void addFile(const fs::path& path) override
     {
-        lock_guard lock(m_foundSourceFilesMutex);
-        m_foundSourceFiles.push_back(path.string());
+        if (stopping) return;
+        {
+            lock_guard lock(m_foundSourceFilesMutex);
+            m_foundSourceFiles.push_back(path.string());
+            numAddedFilesModulo++;
+        }
+        if (numAddedFilesModulo>updateGranularity)
+        {
+            numAddedFilesModulo = 0;
+            listener.updateList();
+        }
     }
 
     void addDirectory(const fs::path& path) override
     {
+        if (stopping) return;
         lock_guard lock(m_pathsToRunMutex);
         m_pathsToRun.push_back(path);
         m_numPathsToProcess++;
@@ -156,6 +208,8 @@ public:
 
     optional<fs::path> getWork()
     {
+        if (stopping)
+            optional<fs::path>();
         lock_guard lock(m_pathsToRunMutex);
         const bool workLeft = !m_pathsToRun.empty();
         return (workLeft)
@@ -165,21 +219,29 @@ public:
 
     void doneWork() override
     {
+        if (stopping)
+            return;
         assert (m_numPathsToProcess>0);
         m_numPathsToProcess--;
+        if (m_numPathsToProcess==0)
+        {
+            qDebug() << "  DR: work done - stopping threads";
+            stopInternal();
+        }
+
     }
 
     bool isDone() override {
-        return m_numPathsToProcess==0;
+        return stopping || m_numPathsToProcess==0;
     }
 
     void logMessage(const string& message) override
     {
-        m_logger.logMessage(message);
+        listener.logMessage(message);
     }
 
 private:
-    Logger& m_logger;
+    DirectoryRunnerListener& listener;
 
     vector<string> m_foundSourceFiles;
     mutex          m_foundSourceFilesMutex;
@@ -188,9 +250,17 @@ private:
     mutex           m_pathsToRunMutex;
 
     atomic<int> m_numPathsToProcess = 0;
+
+    static constexpr int updateGranularity = 10000;
+    atomic<int> numAddedFilesModulo = 0;
+
+    vector<thread> threads;
+    vector<DirectoryRunnerWorker> workers;
+
+    bool stopping = false;
 };
 
-DirectoryRunner* DirectoryRunner::make(Logger& logger)
+DirectoryRunner* DirectoryRunner::make(DirectoryRunnerListener& listener)
 {
-    return new DirectoryRunnerImpl(logger);
+    return new DirectoryRunnerImpl(listener);
 }

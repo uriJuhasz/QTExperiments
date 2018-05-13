@@ -37,12 +37,14 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
     DirectoryRunner.cpp \
-    MainWindow.cpp
+    MainWindow.cpp \
+    MainWindowImpl.cpp
 
 HEADERS += \
     DirectoryRunner.h \
     MainWindow.h \
-    Logger.h
+    Logger.h \
+    MainWindowImpl.h
 
 FORMS += \
     MainWindow.ui

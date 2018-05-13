@@ -2,11 +2,9 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <string>
-#include <optional>
+#include <memory>
 
-using std::string;
-using std::optional;
+using std::unique_ptr;
 
 namespace Ui {
 class MainWindow;
@@ -16,24 +14,24 @@ class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
+protected:
+    explicit MainWindow(QWidget *parent);
+
 public:
-    explicit MainWindow(QWidget *parent = 0);
-    ~MainWindow();
+    virtual ~MainWindow();
+    static unique_ptr<MainWindow> make(QWidget* parent=nullptr);
 
-private slots:
-    void on_selectDirectoryButton_clicked();
+public slots:
+    virtual void on_selectDirectoryButton_clicked() = 0;
 
-    void on_directoryNameWidget_editingFinished();
+    virtual void on_directoryNameWidget_editingFinished() = 0;
 
-    void on_directoryNameWidget_textChanged(const QString &arg1);
+    virtual void on_directoryNameWidget_textChanged(const QString &arg1) = 0;
 
-    void on_startAnalysisButton_clicked();
+    virtual void on_startAnalysisButton_clicked() = 0;
 
-private:
+protected:
     Ui::MainWindow *ui;
-
-    friend class MainWindowPrivate;
-    class MainWindowPrivate* m_private;
 };
 
 #endif // MAINWINDOW_H

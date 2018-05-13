@@ -17,19 +17,29 @@
 using std::string;
 using std::vector;
 
+class DirectoryRunnerListener :
+        public virtual Logger
+{
+protected:
+    inline DirectoryRunnerListener(){}
+public:
+    inline ~DirectoryRunnerListener(){}
+    virtual void updateList() = 0;
+};
+
 class DirectoryRunner
 {
 protected:
     DirectoryRunner();
 public:
-    static DirectoryRunner* make(Logger& logger);
+    static DirectoryRunner* make(DirectoryRunnerListener& listener);
 
     virtual ~DirectoryRunner();
 
-    virtual void run(const fs::path& path) = 0;
+    virtual void start(const fs::path& path) = 0;
     virtual void stop() = 0;
 
-    virtual const vector<string>& getSourceFiles() const = 0;
+    virtual const vector<string>& getSourceFiles() = 0;
 };
 
 #endif // DIRECTORYRUNNER_H
