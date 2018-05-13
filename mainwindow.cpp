@@ -1,20 +1,30 @@
 #include "MainWindow.h"
 #include "ui_mainwindow.h"
 
+#include "Logger.h"
+
 #include <QFileDialog>
 #include <QStringListModel>
 
 #include "DirectoryRunner.h"
 
 #include <memory>
+#include <mutex>
 
 using std::unique_ptr;
 using std::make_unique;
+using std::mutex;
+using std::lock_guard;
 
-class MainWindowPrivate
+class MainWindowPrivate :
+        public virtual Logger
 {
 public:
-    MainWindowPrivate(MainWindow& mainWindow) : m_mainWindow(mainWindow){}
+    MainWindowPrivate(MainWindow& mainWindow) :
+        m_mainWindow(mainWindow),
+        m_logModel(new QStringListModel())
+    {
+    }
 
     const string& getDirectoryName() const{ return m_dirName; }
     void setDirectory(const string& directory, const bool updateWidget=true)
@@ -31,7 +41,7 @@ public:
             return;
 
         if (!m_directoryRunner)
-            m_directoryRunner = unique_ptr<DirectoryRunner>(DirectoryRunner::make());
+            m_directoryRunner = unique_ptr<DirectoryRunner>(DirectoryRunner::make(*this));
 
         m_directoryRunner->run(p);
 
@@ -47,10 +57,23 @@ public:
     }
     void stopDirectoryRunner();
 
+    void logMessage(const string& message) override
+    {
+        lock_guard lock(m_logMutex);
+        const int row = m_logModel->rowCount();
+        if (m_logModel->insertRow(row))
+            m_logModel->setData(m_logModel->index(row, 0), QString::fromStdString(message));
+    }
+
 private:
+    friend class MainWindow;
+
     MainWindow& m_mainWindow;
 
     string m_dirName;
+    QStringListModel* const m_logModel;
+
+    mutex  m_logMutex;
 
     unique_ptr<DirectoryRunner> m_directoryRunner;
 };
@@ -63,6 +86,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     ui->pathListView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->logWindow->setModel(m_private->m_logModel);
 }
 
 MainWindow::~MainWindow()

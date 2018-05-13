@@ -44,7 +44,7 @@ static inline QDebug& operator<<(QDebug& qd, const fs::path& p)
     return qd;
 }
 
-class DirectoryRunnerWorkerInterface
+class DirectoryRunnerWorkerInterface : public virtual Logger
 {
 public:
     virtual ~DirectoryRunnerWorkerInterface(){}
@@ -78,7 +78,7 @@ public:
 
     void processPath(const fs::path& path)
     {
-        qDebug() << "   Entering path \"" << path << "\"";
+        m_runner.logMessage("   Entering path \"" + path.string() + "\"");
         for (const auto de : directory_iterator(path))
         {
             if (fs::is_directory(de))
@@ -86,7 +86,7 @@ public:
             else if (fs::is_regular_file(de))
                 m_runner.addFile(de.path());
             else
-                qDebug() << "  Unknown file type \"" << path << "\"";
+                m_runner.logMessage("   Unknown file type \"" + de.path().string() + "\"");
         }
 
     }
@@ -99,6 +99,10 @@ class DirectoryRunnerImpl :
         public virtual DirectoryRunnerWorkerInterface
 {
 public:
+    DirectoryRunnerImpl(Logger& logger) :
+        m_logger(logger)
+    {
+    }
     void run(const fs::path& path) override
     {
         m_foundSourceFiles.clear();
@@ -169,7 +173,14 @@ public:
         return m_numPathsToProcess==0;
     }
 
+    void logMessage(const string& message) override
+    {
+        m_logger.logMessage(message);
+    }
+
 private:
+    Logger& m_logger;
+
     vector<string> m_foundSourceFiles;
     mutex          m_foundSourceFilesMutex;
 
@@ -179,7 +190,7 @@ private:
     atomic<int> m_numPathsToProcess = 0;
 };
 
-DirectoryRunner* DirectoryRunner::make()
+DirectoryRunner* DirectoryRunner::make(Logger& logger)
 {
-    return new DirectoryRunnerImpl();
+    return new DirectoryRunnerImpl(logger);
 }

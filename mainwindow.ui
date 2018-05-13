@@ -70,6 +70,16 @@
      <string>Analyze folder</string>
     </property>
    </widget>
+   <widget class="QListView" name="logWindow">
+    <property name="geometry">
+     <rect>
+      <x>720</x>
+      <y>90</y>
+      <width>371</width>
+      <height>201</height>
+     </rect>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">

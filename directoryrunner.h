@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 
-
+#include "Logger.h"
 
 #ifdef __cpp_lib_filesystem
 #include <filesystem>
@@ -22,7 +22,7 @@ class DirectoryRunner
 protected:
     DirectoryRunner();
 public:
-    static DirectoryRunner* make();
+    static DirectoryRunner* make(Logger& logger);
 
     virtual ~DirectoryRunner();
 

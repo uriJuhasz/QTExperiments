@@ -41,7 +41,8 @@ SOURCES += \
 
 HEADERS += \
     DirectoryRunner.h \
-    MainWindow.h
+    MainWindow.h \
+    Logger.h
 
 FORMS += \
     MainWindow.ui
