@@ -166,13 +166,18 @@ public:
                 threads[i].join();
             threads.clear();
             workers.clear();
-            listener.updateList();
         }
         stopping = false;
     }
     void stop() override
     {
         qDebug() << "  DR: stop called - stopping threads";
+        stopInternal();
+    }
+
+    void done() override
+    {
+        qDebug() << "  DR: done called - stopping threads";
         stopInternal();
     }
 
@@ -225,8 +230,9 @@ public:
         m_numPathsToProcess--;
         if (m_numPathsToProcess==0)
         {
-            qDebug() << "  DR: work done - stopping threads";
+            qDebug() << "  DR: work done";
             stopInternal();
+            listener.directoryRunnerDone();
         }
 
     }

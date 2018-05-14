@@ -25,6 +25,7 @@ protected:
 public:
     inline ~DirectoryRunnerListener(){}
     virtual void updateList() = 0;
+    virtual void directoryRunnerDone() = 0;
 };
 
 class DirectoryRunner
@@ -38,6 +39,7 @@ public:
 
     virtual void start(const fs::path& path) = 0;
     virtual void stop() = 0;
+    virtual void done() = 0;
 
     virtual const vector<string>& getSourceFiles() = 0;
 };
