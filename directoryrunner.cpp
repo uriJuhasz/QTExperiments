@@ -231,7 +231,6 @@ public:
         if (m_numPathsToProcess==0)
         {
             qDebug() << "  DR: work done";
-            stopInternal();
             listener.directoryRunnerDone();
         }
 
