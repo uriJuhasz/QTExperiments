@@ -2,19 +2,23 @@
 #include <thread>
 
 #include <QDebug>
+#include <QTime>
 
 #include <deque>
 #include <mutex>
 #include <optional>
 #include <atomic>
 #include <cassert>
+#include <condition_variable>
 
 using std::thread;
 using std::deque;
 using std::optional;
 using std::mutex;
 using std::lock_guard;
+using std::unique_lock;
 using std::atomic;
+using std::condition_variable;
 using fs::directory_iterator;
 
 template<class T> T popDeque(deque<T>& deque)
@@ -78,7 +82,7 @@ public:
 
     void processPath(const fs::path& path)
     {
-        m_runner.logMessage("   Entering path \"" + path.string() + "\"");
+//        m_runner.logMessage("   Entering path \"" + path.string() + "\"");
         for (const auto de : directory_iterator(path))
         {
             if (fs::is_directory(de))
@@ -86,7 +90,8 @@ public:
             else if (fs::is_regular_file(de))
                 m_runner.addFile(de.path());
             else
-                m_runner.logMessage("   Unknown file type \"" + de.path().string() + "\"");
+                qDebug() << "   Unknown file type \"" << de.path().string() << "\"";
+                            //m_runner.logMessage("   Unknown file type \"" + de.path().string() + "\"");
         }
 
     }
@@ -125,8 +130,8 @@ public:
             qDebug() << "    " << name;
         }*/
 
-        assert(m_numPathsToProcess==0);
-        m_numPathsToProcess = 0;
+        assert(m_numDirectoriesPathsToProcess==0);
+        m_numDirectoriesPathsToProcess = 0;
         assert(m_pathsToRun.empty());
         m_pathsToRun.clear();
         addDirectory(path);
@@ -138,7 +143,10 @@ public:
         const int numThreads = numCPUs;
         threads.reserve(numThreads);
         workers.reserve(numThreads);
+
         qDebug() << "  Starting threads";
+        QTime timer;
+        timer.start();
         for (int i=0; i<numThreads; ++i)
         {
             workers.emplace_back(*this);
@@ -146,14 +154,17 @@ public:
             threads.emplace_back(thread([&worker](){worker.start();}));
         }
 
-/*        qDebug() << "  Waiting for threads";
+        qDebug() << "  Waiting for threads";
         for (int i=0; i<numThreads; ++i)
             threads[i].join();
 
         threads.clear();
         workers.clear();
 
-        qDebug() << "  Number of subdirectories:" << m_foundSourceFiles.size();*/
+        const qint64 elapsed = timer.elapsed();
+        qDebug() << "  Done joining threads - " << elapsed << "ms";
+
+        qDebug() << "  Number of subdirectories:" << m_foundSourceFiles.size();
     }
     void stopInternal()
     {
@@ -161,7 +172,7 @@ public:
         lock_guard lock(m_pathsToRunMutex);
         {
             m_pathsToRun.clear();
-            m_numPathsToProcess = 0;
+            m_numDirectoriesPathsToProcess = 0;
             for (unsigned int i=0; i<threads.size(); ++i)
                 threads[i].join();
             threads.clear();
@@ -206,38 +217,44 @@ public:
     void addDirectory(const fs::path& path) override
     {
         if (stopping) return;
-        lock_guard lock(m_pathsToRunMutex);
+        unique_lock<mutex> guard(m_pathsToRunMutex);
         m_pathsToRun.push_back(path);
-        m_numPathsToProcess++;
+        m_numDirectoriesPathsToProcess++;
+        workAvailable.notify_all();
     }
 
     optional<fs::path> getWork()
     {
         if (stopping)
-            optional<fs::path>();
-        lock_guard lock(m_pathsToRunMutex);
-        const bool workLeft = !m_pathsToRun.empty();
-        return (workLeft)
-            ? optional<fs::path>(popDeque(m_pathsToRun))
-            : optional<fs::path>();
+            return optional<fs::path>();
+        unique_lock<mutex> guard(m_pathsToRunMutex);
+        while (!stopping && m_numDirectoriesPathsToProcess>0)
+        {
+            const bool workLeft = !m_pathsToRun.empty();
+            if (workLeft)
+                return optional<fs::path>(popDeque(m_pathsToRun));
+            workAvailable.wait(guard);
+        }
+        return optional<fs::path>();
     }
 
     void doneWork() override
     {
         if (stopping)
             return;
-        assert (m_numPathsToProcess>0);
-        m_numPathsToProcess--;
-        if (m_numPathsToProcess==0)
+        assert (m_numDirectoriesPathsToProcess>0);
+        m_numDirectoriesPathsToProcess--;
+        if (m_numDirectoriesPathsToProcess==0)
         {
             qDebug() << "  DR: work done";
-            listener.directoryRunnerDone();
+            workAvailable.notify_all();
+//            listener.directoryRunnerDone();
         }
 
     }
 
     bool isDone() override {
-        return stopping || m_numPathsToProcess==0;
+        return stopping || m_numDirectoriesPathsToProcess==0;
     }
 
     void logMessage(const string& message) override
@@ -254,13 +271,15 @@ private:
     deque<fs::path> m_pathsToRun;
     mutex           m_pathsToRunMutex;
 
-    atomic<int> m_numPathsToProcess = 0;
+    atomic<int> m_numDirectoriesPathsToProcess = 0;
 
     static constexpr int updateGranularity = 10000;
     atomic<int> numAddedFilesModulo = 0;
 
     vector<thread> threads;
     vector<DirectoryRunnerWorker> workers;
+
+    condition_variable workAvailable;
 
     bool stopping = false;
 };
