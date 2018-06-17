@@ -15,10 +15,10 @@ TEMPLATE = app
 #QMAKE_CXXFLAGS += /std:c++17
 
 
-QMAKE_CXXFLAGS += -std=c++17
-QMAKE_CXXFLAGS += -Wall -Wextra -pedantic
-#QMAKE_CXXFLAGS += -W4
-# QMAKE_LFLAGS += -lstdc++fs
+gcc:QMAKE_CXXFLAGS += -std=c++17
+gcc:QMAKE_CXXFLAGS += -Wall -Wextra -pedantic
+msvc:QMAKE_CXXFLAGS += /W3 -std:c++17
+#gcc:QMAKE_LFLAGS += -lstdc++fs
 
 CONFIG += c++17
 
@@ -33,23 +33,26 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
+INCLUDEPATH += $$PWD/src/
 
 SOURCES += \
-        main.cpp \
-    DirectoryRunner.cpp \
-    MainWindow.cpp \
-    MainWindowImpl.cpp
+        src/main.cpp \
+    src/DirectoryRunner/DirectoryRunner.cpp \
+    src/GUIMain/MainWindow.cpp \
+    src/GUIMain/MainWindowImpl.cpp \
+    src/Logger/Logger.cpp
 
 HEADERS += \
-    DirectoryRunner.h \
-    MainWindow.h \
-    Logger.h \
-    MainWindowImpl.h
+    src/DirectoryRunner/DirectoryRunner.h \
+    src/GUIMain/MainWindow.h \
+    src/GUIMain/MainWindowImpl.h \
+    src/Logger/Logger.h \
+
 
 FORMS += \
-    MainWindow.ui
+    src/GUIMain/MainWindow.ui
 
-LIBS += -lstdc++fs
+gcc: LIBS += -lstdc++fs
 
 #win32:     !win32-g++: PRE_TARGETDEPS += $$PWD/../../../msys64/mingw64/lib/gcc/x86_64-w64-mingw32/7.3.0/stdc++fs.lib
 #else:  unix|win32-g++: PRE_TARGETDEPS += $$PWD/../../../msys64/mingw64/lib/gcc/x86_64-w64-mingw32/7.3.0/libstdc++fs.a

@@ -114,14 +114,14 @@ public:
     {
         m_foundSourceFiles.clear();
         const int numCPUs = thread::hardware_concurrency();
-        qDebug() << "DR.run(" << path.string() << "): Number of CPUs:" << numCPUs;
+        qDebug() << " DR.run(" << path.string() << "): Number of CPUs:" << numCPUs;
         if (!fs::exists(path))
         {
-            qDebug() << " Path \"" << path.string() << "\" not found";
+            qDebug() << "  Path \"" << path.string() << "\" not found";
             return;
         }
-        qDebug() << "  Current directory" << fs::current_path();
-        qDebug() << "  Running directory" << path;
+        qDebug() << "   Current directory" << fs::current_path();
+        qDebug() << "   Running directory" << path;
 
 /*        for (auto de : directory_iterator(path))
         {
@@ -144,7 +144,7 @@ public:
         threads.reserve(numThreads);
         workers.reserve(numThreads);
 
-        qDebug() << "  Starting threads";
+        qDebug() << "  DR.run: Starting threads";
         QTime timer;
         timer.start();
         for (int i=0; i<numThreads; ++i)
@@ -154,7 +154,7 @@ public:
             threads.emplace_back(thread([&worker](){worker.start();}));
         }
 
-        qDebug() << "  Waiting for threads";
+        qDebug() << "  DR.run: Waiting for threads";
         for (int i=0; i<numThreads; ++i)
             threads[i].join();
 
@@ -162,9 +162,9 @@ public:
         workers.clear();
 
         const qint64 elapsed = timer.elapsed();
-        qDebug() << "  Done joining threads - " << elapsed << "ms";
+        qDebug() << "  DR.run: Done joining threads - " << elapsed << "ms";
 
-        qDebug() << "  Number of subdirectories:" << m_foundSourceFiles.size();
+        qDebug() << "   Number of subdirectories:" << m_foundSourceFiles.size();
     }
     void stopInternal()
     {
