@@ -2,7 +2,7 @@
 #define MAINWINDOWIMPL_H
 
 #include "GUIMain/MainWindow.h"
-#include "Logger.h"
+#include "Logger/Logger.h"
 #include "DirectoryRunner/DirectoryRunner.h"
 
 #include <QStringListModel>
@@ -32,7 +32,7 @@ private:
     void startDirectoryRunner();
     void stopDirectoryRunner();
 
-    void logMessage(const string& message) override;
+    void logMessageInternal(const LogLevel level, const string& message) override;
     void updateList() override;
 
     void directoryRunnerDone() override;

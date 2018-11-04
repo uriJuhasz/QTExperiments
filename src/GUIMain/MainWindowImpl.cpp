@@ -47,7 +47,7 @@ void MainWindowImpl::stopDirectoryRunner()
     m_directoryRunner->stop();
 }
 
-void MainWindowImpl::logMessage(const string& message)
+void MainWindowImpl::logMessageInternal(const LogLevel level, const string& message)
 {
     lock_guard lock(m_logMutex);
     const int row = m_logModel->rowCount();

@@ -83,7 +83,7 @@ public:
     void processPath(const fs::path& path)
     {
 //        m_runner.logMessage("   Entering path \"" + path.string() + "\"");
-        for (const auto de : directory_iterator(path))
+        for (const auto& de : directory_iterator(path))
         {
             if (fs::is_directory(de))
                 m_runner.addDirectory(de.path());
@@ -113,7 +113,7 @@ public:
     void start(const fs::path& path) override
     {
         m_foundSourceFiles.clear();
-        const int numCPUs = thread::hardware_concurrency();
+        const unsigned int numCPUs = thread::hardware_concurrency();
         qDebug() << " DR.run(" << path.string() << "): Number of CPUs:" << numCPUs;
         if (!fs::exists(path))
         {
@@ -140,14 +140,14 @@ public:
         assert(workers.empty());
         workers.clear();
 
-        const int numThreads = numCPUs;
+        const unsigned int numThreads = numCPUs;
         threads.reserve(numThreads);
         workers.reserve(numThreads);
 
         qDebug() << "  DR.run: Starting threads";
         QTime timer;
         timer.start();
-        for (int i=0; i<numThreads; ++i)
+        for (unsigned int i=0; i<numThreads; ++i)
         {
             workers.emplace_back(*this);
             DirectoryRunnerWorker& worker = workers.back();
@@ -155,7 +155,7 @@ public:
         }
 
         qDebug() << "  DR.run: Waiting for threads";
-        for (int i=0; i<numThreads; ++i)
+        for (unsigned int i=0; i<numThreads; ++i)
             threads[i].join();
 
         threads.clear();
@@ -169,7 +169,7 @@ public:
     void stopInternal()
     {
         stopping = true;
-        lock_guard lock(m_pathsToRunMutex);
+        lock_guard<mutex> lock(m_pathsToRunMutex);
         {
             m_pathsToRun.clear();
             m_numDirectoriesPathsToProcess = 0;
@@ -198,6 +198,10 @@ public:
         return m_foundSourceFiles;
     }
 
+    void logMessageInternal(const Logger::LogLevel, const std::string&) override
+    {
+
+    }
 public:
     void addFile(const fs::path& path) override
     {
@@ -217,13 +221,15 @@ public:
     void addDirectory(const fs::path& path) override
     {
         if (stopping) return;
+        logMessage("DR: adding directory(" + path.string() + ")");
+
         unique_lock<mutex> guard(m_pathsToRunMutex);
         m_pathsToRun.push_back(path);
         m_numDirectoriesPathsToProcess++;
         workAvailable.notify_all();
     }
 
-    optional<fs::path> getWork()
+    optional<fs::path> getWork() override
     {
         if (stopping)
             return optional<fs::path>();
@@ -257,12 +263,16 @@ public:
         return stopping || m_numDirectoriesPathsToProcess==0;
     }
 
-    void logMessage(const string& message) override
+    void logMessage(const string& message)
     {
-        listener.logMessage(message);
+        listener.logMessage(LogLevel::Info,message);
     }
 
 private:
+    DirectoryRunnerImpl() = delete;
+    DirectoryRunnerImpl(const DirectoryRunnerImpl&) = delete;
+    DirectoryRunnerImpl& operator=(const DirectoryRunnerImpl&) = delete;
+
     DirectoryRunnerListener& listener;
 
     vector<string> m_foundSourceFiles;
