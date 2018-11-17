@@ -1,8 +1,13 @@
 #include "MainWindowImpl.h"
 #include "ui_MainWindow.h"
 
+#include "Common/QDebugHelper.h"
+
 #include <QFileDialog>
 #include <QTime>
+#include <QElapsedTimer>
+#include <QEvent>
+#include <QMetaEnum>
 #include <QDebug>
 
 #include <optional>
@@ -10,6 +15,7 @@
 using std::make_unique;
 using std::lock_guard;
 using std::optional;
+
 
 MainWindowImpl::MainWindowImpl(QWidget* parent) :
     MainWindow(parent),
@@ -31,23 +37,26 @@ void MainWindowImpl::setDirectory(const string& directory, const bool updateWidg
 
 void MainWindowImpl::startDirectoryRunner()
 {
-    auto p = fs::path(m_dirName);
-    if (!fs::exists(p))
-        return;
+    qDebug() << "[" << std::this_thread::get_id() << "]+MW.startDirectoryRunner()";
 
-    if (!m_directoryRunner)
-        m_directoryRunner = unique_ptr<DirectoryRunner>(DirectoryRunner::make(*this));
+    const auto p = fs::path(m_dirName);
+    if (fs::exists(p))
+    {
+        if (!m_directoryRunner)
+            m_directoryRunner = unique_ptr<DirectoryRunner>(DirectoryRunner::make(*this));
 
-    m_directoryRunner->start(p);
-
-    updateListSignalHandler();
+        this->ui->startAnalysisButton->setEnabled(false);
+        m_directoryRunner->start(p);
+        updateListSignalHandler();
+    }
+    qDebug() << "[" << std::this_thread::get_id() << "]-MW.startDirectoryRunner()";
 }
 void MainWindowImpl::stopDirectoryRunner()
 {
     m_directoryRunner->stop();
 }
 
-void MainWindowImpl::logMessageInternal(const LogLevel level, const string& message)
+void MainWindowImpl::logMessageInternal(const LogLevel /*level*/, const string& message)
 {
     lock_guard lock(m_logMutex);
     const int row = m_logModel->rowCount();
@@ -60,7 +69,26 @@ void MainWindowImpl::logMessageInternal(const LogLevel level, const string& mess
 
 void MainWindowImpl::updateList()
 {
+    QElapsedTimer timer; timer.start();
+    qDebug() << "+[" << std::this_thread::get_id() << "]MW.updateList()";
     updateListSignal();
+    qDebug() << "-[" << std::this_thread::get_id() << "]MW.updateList() - " << timer.elapsed() << "ms";
+}
+
+QDebug operator<<(QDebug str, const QEvent * ev) {
+    static int eventEnumIndex = QEvent::staticMetaObject.indexOfEnumerator("Type");
+    str << "QEvent";
+    if (ev)
+    {
+        const auto type = ev->type();
+        const QString name = QEvent::staticMetaObject.enumerator(eventEnumIndex).valueToKey(type);
+        if (!name.isEmpty()) str << name; else str << type;
+    }
+    else
+    {
+      str << (void*)ev;
+    }
+    return str.maybeSpace();
 }
 
 class QEventDRDone : public QEvent
@@ -73,15 +101,35 @@ public:
    }
 };
 
+static unsigned int qEventND = 0;
+
+static std::string evndstr()
+{
+    return std::string(qEventND,' ');
+}
 bool MainWindowImpl::event(QEvent *e)
 {
+    QEvent ev2 = e ? *e : QEvent(QEvent::None);
+    QElapsedTimer timer; timer.start();
+    qDebug().nospace().noquote() << evndstr() << "[" << std::this_thread::get_id() << "]+MW.event(" << e << ")";
+    qEventND++;
+
+    bool retVal = true;
     if (e && e->type()==QEventDRDone::staticType())
     {
+        qDebug() << evndstr() << "[" << std::this_thread::get_id() << "]+MW.updateListEvent()";
+
+        this->ui->startAnalysisButton->setEnabled(true);
 //        m_directoryRunner->done();
-//        updateListSignalHandler();
-        return true;
+        updateListSignalHandler();
+        retVal = true;
+        qDebug() << evndstr() << "[" << std::this_thread::get_id() << "]-MW.updateListEvent()";
     }else
-        return QMainWindow::event(e);
+        retVal = QMainWindow::event(e);
+
+    qEventND--;
+    qDebug().nospace().noquote() << evndstr() << "[" << std::this_thread::get_id() << "]-MW.event(" << e << ") - " << timer.elapsed() << "ms";
+    return retVal;
 }
 void MainWindowImpl::directoryRunnerDone()
 {
@@ -90,27 +138,31 @@ void MainWindowImpl::directoryRunnerDone()
 
 void MainWindowImpl::updateListSignalHandler()
 {
-    qDebug() << " +MW.updateList";
-    QTime timer;
-    timer.start();
+    qDebug() << "    [" << std::this_thread::get_id() << "]+MW.updateListSignal";
+    QElapsedTimer timer; timer.start();
 
-    const vector<string> paths = m_directoryRunner->getSourceFiles();
+    {
+        const vector<string> paths = m_directoryRunner->getSourceFiles();
+        qDebug() << "      [" << std::this_thread::get_id() << "]MW.updateListSignal(num=" << paths.size() << ").0 - " << timer.elapsed() << "ms";
+        {
+            QStringList pathNames;
+            for (auto p : paths)
+                pathNames << QString::fromStdString(p);
 
-    QStringList pathNames;
-    for (auto p : paths)
-        pathNames << QString::fromStdString(p);
+            qDebug() << "      [" << std::this_thread::get_id() << "]MW.updateListSignal.1 - " << timer.elapsed() << "ms";
+            QStringListModel* pathListModel = new QStringListModel(pathNames, ui->pathListView);
 
-    qDebug() << "  MW.updateList.1 - " << timer.elapsed() << "ms";
-    QStringListModel* pathListModel = new QStringListModel(pathNames, ui->pathListView);
+            qDebug() << "      [" << std::this_thread::get_id() << "]MW.updateListSignal.2 - " << timer.elapsed() << "ms";
+            ui->pathListView->setModel(pathListModel);
 
-    qDebug() << "  MW.updateList.2 - " << timer.elapsed() << "ms";
-    ui->pathListView->setModel(pathListModel);
-
-    qDebug() << "  MW.updateList.3 - " << timer.elapsed() << "ms";
-//    ui->pathListView->scrollToBottom();
+            qDebug() << "      [" << std::this_thread::get_id() << "]MW.updateListSignal.3 - " << timer.elapsed() << "ms";
+        //    ui->pathListView->scrollToBottom();
+        }
+        qDebug() << "      [" << std::this_thread::get_id() << "]MW.updateListSignal.4 - " << timer.elapsed() << "ms";
+    }
 
     const qint64 elapsed = timer.elapsed();
-    qDebug() << " -MW.updateList - " << elapsed << "ms";
+    qDebug() << "     [" << std::this_thread::get_id() << "]-MW.updateListSignal - " << elapsed << "ms";
 }
 
 void MainWindowImpl::on_selectDirectoryButton_clicked()
@@ -131,7 +183,9 @@ void MainWindowImpl::on_directoryNameWidget_textChanged(const QString &arg1)
 
 void MainWindowImpl::on_startAnalysisButton_clicked()
 {
+    qDebug() << " +MW.on_startAnalysisButton_clicked";
     startDirectoryRunner();
+    qDebug() << " -MW.on_startAnalysisButton_clicked";
 }
 
 unique_ptr<MainWindow> MainWindow::make(QWidget* parent)

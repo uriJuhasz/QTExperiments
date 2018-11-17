@@ -41,7 +41,7 @@ public:
     virtual void stop() = 0;
     virtual void done() = 0;
 
-    virtual const vector<string>& getSourceFiles() = 0;
+    virtual const vector<string> getSourceFiles() = 0;
 };
 
 #endif // DIRECTORYRUNNER_H
