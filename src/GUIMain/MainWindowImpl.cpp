@@ -75,22 +75,6 @@ void MainWindowImpl::updateList()
     qDebug() << "-[" << std::this_thread::get_id() << "]MW.updateList() - " << timer.elapsed() << "ms";
 }
 
-QDebug operator<<(QDebug str, const QEvent * ev) {
-    static int eventEnumIndex = QEvent::staticMetaObject.indexOfEnumerator("Type");
-    str << "QEvent";
-    if (ev)
-    {
-        const auto type = ev->type();
-        const QString name = QEvent::staticMetaObject.enumerator(eventEnumIndex).valueToKey(type);
-        if (!name.isEmpty()) str << name; else str << type;
-    }
-    else
-    {
-      str << (void*)ev;
-    }
-    return str.maybeSpace();
-}
-
 class QEventDRDone : public QEvent
 {
 public:

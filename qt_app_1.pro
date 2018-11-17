@@ -41,17 +41,9 @@ SOURCES += \
     src/GUIMain/MainWindow.cpp \
     src/GUIMain/MainWindowImpl.cpp \
     src/Logger/Logger.cpp \
-    src/DirectoryRunner/DirectoryRunner.cpp \
-    src/GUIMain/MainWindow.cpp \
-    src/GUIMain/MainWindowImpl.cpp \
-    src/Logger/Logger.cpp \
-    src/main.cpp
+    src/Common/QDebugHelper.cpp
 
 HEADERS += \
-    src/DirectoryRunner/DirectoryRunner.h \
-    src/GUIMain/MainWindow.h \
-    src/GUIMain/MainWindowImpl.h \
-    src/Logger/Logger.h \
     src/DirectoryRunner/DirectoryRunner.h \
     src/GUIMain/MainWindow.h \
     src/GUIMain/MainWindowImpl.h \

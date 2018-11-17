@@ -2,6 +2,9 @@
 #define QDEBUGHELPER_H
 
 #include <QDebug>
+#include <QMetaEnum>
+#include <QEvent>
+
 #include <thread>
 #include <sstream>
 #include <string>
@@ -15,23 +18,14 @@
 #endif
 
 
-static inline QDebug operator<<(QDebug qd, const std::thread::id& threadId)
-{
-    std::stringstream ss;
-    ss << threadId;
-    qd << ss.str().c_str();
-    return qd;
-}
+QDebug operator<<(QDebug qd, const std::thread::id& threadId);
 
-static inline QDebug operator<<(QDebug qd, const std::string& s)
-{
-    qd << s.c_str();
-    return qd;
-}
-static inline QDebug operator<<(QDebug qd, const fs::path& p)
-{
-    qd << p.string();
-    return qd;
-}
+QDebug operator<<(QDebug qd, const std::string& s);
+
+QDebug operator<<(QDebug qd, const fs::path& p);
+
+QDebug operator<<(QDebug qd, const QEvent * ev);
+
+QString toQString(const QEvent * ev);
 
 #endif // QDEBUGHELPER_H
